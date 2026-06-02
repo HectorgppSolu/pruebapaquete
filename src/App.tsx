@@ -12,7 +12,7 @@ function App() {
     setGreetMsg(await invoke("greet", { name }));
   }
 // En algún archivo .tsx
-const variableSinUsar = "hola";    
+
   return (
     
     <main className="container">
