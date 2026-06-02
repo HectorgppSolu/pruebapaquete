@@ -47,7 +47,7 @@ jobs:
         include:
           - platform: [windows-latest]  
             args: ''
-            
+
     runs-on: windows-latest
     steps:
      - uses: actions/checkout@v4
@@ -81,7 +81,7 @@ jobs:
      - name: install dependencies frontend
        run: pnpm install
 
-     - uses: tauri-apps/tauri-action@v1
+     - uses: tauri-apps/tauri-action@v2
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        with:
