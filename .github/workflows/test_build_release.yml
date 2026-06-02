@@ -35,6 +35,10 @@ jobs:
 
       - name: Run tests lint 
         run: pnpm run lint
+
+      - name: Run tests Clippy
+        working-directory: src-tauri
+        run: cargo clippy
       
   publish_release_tauri:
     needs: test_build_release
@@ -85,8 +89,8 @@ jobs:
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        with:
-         tagName: V0.1.2
-         releaseName: "Release V0.1.2"
+         tagName: V0.1.3
+         releaseName: "Release V0.1.3"
          releaseBody: "See the changelog for more details."
          releaseDraft: false
          perelease: false
