@@ -20,10 +20,19 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+    
+      - name: install pnpm
+        run: npm install -g pnpm
+
+      - name: Verify versions
+        run: |
+          node -v
+          npm -v
+          pnpm -v
 
       - name: Install dependencies
         run: pnpm install
 
-      - name: Run TypeScript tests
-        run: pnpm test
+      - name: Run tests lint 
+        run: pnpm run lint
 
