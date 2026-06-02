@@ -23,12 +23,19 @@ jobs:
     
       - name: install pnpm
         run: npm install -g pnpm
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Verify versions
         run: |
           node -v
           npm -v
           pnpm -v
+          cargo --version
+          rustc --version
 
       - name: Install dependencies
         run: pnpm install
