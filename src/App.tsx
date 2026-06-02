@@ -11,8 +11,7 @@ function App() {
     // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
     setGreetMsg(await invoke("greet", { name }));
   }
-// En algún archivo .tsx
-const variableSinUsar = "hola";    
+
   return (
     
     <main className="container">
