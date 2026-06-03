@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+```tsx
+import { useEffect, useState, useCallback } from 'react';
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -6,34 +7,44 @@ const CheckUpdates = () => {
   const [update, setUpdate] = useState<Update | null>(null);
   const [installing, setInstalling] = useState(false);
 
-  // 🔍 Función central para revisar updates
-  const checkUpdate = async () => {
+  const checkUpdate = useCallback(async () => {
     try {
       const result = await check();
 
-      // Evita re-render innecesario si ya hay update mostrada
-      if (result && (!update || result.version !== update.version)) {
-        setUpdate(result);
-      }
+      setUpdate((current) => {
+        if (!result) {
+          return current;
+        }
+
+        if (!current || result.version !== current.version) {
+          return result;
+        }
+
+        return current;
+      });
     } catch (err) {
       console.error('Updater error:', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    let interval: any;
+    const handleFocus = () => {
+      void checkUpdate();
+    };
 
-    checkUpdate();
+    void checkUpdate();
 
-    interval = setInterval(checkUpdate, 60000);
+    const interval: ReturnType<typeof setInterval> = setInterval(() => {
+      void checkUpdate();
+    }, 60000);
 
-    window.addEventListener('focus', checkUpdate);
+    window.addEventListener('focus', handleFocus);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', checkUpdate);
+      window.removeEventListener('focus', handleFocus);
     };
-  }, []);
+  }, [checkUpdate]);
 
   if (installing) {
     return (
@@ -43,14 +54,15 @@ const CheckUpdates = () => {
     );
   }
 
-  if (!update) return null;
+  if (!update) {
+    return null;
+  }
 
   return (
     <div style={styles.container}>
       <span>🚀 Nueva versión {update.version}</span>
 
       <div style={{ display: 'flex', gap: 8 }}>
-  
         <button
           style={styles.primaryButton}
           onClick={async () => {
@@ -120,3 +132,4 @@ const styles = {
 };
 
 export default CheckUpdates;
+```
