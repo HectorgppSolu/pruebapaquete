@@ -1,9 +1,8 @@
-```tsx
 import { useEffect, useState, useCallback } from 'react';
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
-const CheckUpdates = () => {
+function CheckUpdates() {
   const [update, setUpdate] = useState<Update | null>(null);
   const [installing, setInstalling] = useState(false);
 
@@ -11,19 +10,17 @@ const CheckUpdates = () => {
     try {
       const result = await check();
 
-      setUpdate((current) => {
-        if (!result) {
+      if (result) {
+        setUpdate((current) => {
+          if (!current || current.version !== result.version) {
+            return result;
+          }
+
           return current;
-        }
-
-        if (!current || result.version !== current.version) {
-          return result;
-        }
-
-        return current;
-      });
-    } catch (err) {
-      console.error('Updater error:', err);
+        });
+      }
+    } catch (error) {
+      console.error('Updater error:', error);
     }
   }, []);
 
@@ -32,9 +29,7 @@ const CheckUpdates = () => {
       void checkUpdate();
     };
 
-    void checkUpdate();
-
-    const interval: ReturnType<typeof setInterval> = setInterval(() => {
+    const interval = setInterval(() => {
       void checkUpdate();
     }, 60000);
 
@@ -58,6 +53,17 @@ const CheckUpdates = () => {
     return null;
   }
 
+  const handleInstall = async () => {
+    try {
+      setInstalling(true);
+      await update.downloadAndInstall();
+      await relaunch();
+    } catch (error) {
+      console.error('Error al instalar:', error);
+      setInstalling(false);
+    }
+  };
+
   return (
     <div style={styles.container}>
       <span>🚀 Nueva versión {update.version}</span>
@@ -65,17 +71,8 @@ const CheckUpdates = () => {
       <div style={{ display: 'flex', gap: 8 }}>
         <button
           style={styles.primaryButton}
-          onClick={async () => {
-            try {
-              setInstalling(true);
-
-              await update.downloadAndInstall();
-
-              await relaunch();
-            } catch (err) {
-              console.error('Error al instalar:', err);
-              setInstalling(false);
-            }
+          onClick={() => {
+            void handleInstall();
           }}
         >
           Actualizar
@@ -90,7 +87,7 @@ const CheckUpdates = () => {
       </div>
     </div>
   );
-};
+}
 
 const styles = {
   container: {
@@ -132,4 +129,3 @@ const styles = {
 };
 
 export default CheckUpdates;
-```
