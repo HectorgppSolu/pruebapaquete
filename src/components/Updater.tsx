@@ -23,14 +23,10 @@ const CheckUpdates = () => {
   useEffect(() => {
     let interval: any;
 
-    // 🟢 Check al iniciar
     checkUpdate();
 
-    // 🔁 Check cada 10 minutos
-    //interval = setInterval(checkUpdate, 10 * 60 * 1000);
     interval = setInterval(checkUpdate, 60000);
 
-    // 🖥️ Check cuando el usuario regresa a la app
     window.addEventListener('focus', checkUpdate);
 
     return () => {
@@ -39,7 +35,6 @@ const CheckUpdates = () => {
     };
   }, []);
 
-  // 🔄 Estado instalando
   if (installing) {
     return (
       <div style={styles.container}>
@@ -48,7 +43,6 @@ const CheckUpdates = () => {
     );
   }
 
-  // ❌ No hay update
   if (!update) return null;
 
   return (
@@ -56,7 +50,7 @@ const CheckUpdates = () => {
       <span>🚀 Nueva versión {update.version}</span>
 
       <div style={{ display: 'flex', gap: 8 }}>
-        {/* 🔄 Instalar */}
+  
         <button
           style={styles.primaryButton}
           onClick={async () => {
@@ -75,7 +69,6 @@ const CheckUpdates = () => {
           Actualizar
         </button>
 
-        {/* ❌ Cerrar */}
         <button
           style={styles.closeButton}
           onClick={() => setUpdate(null)}
@@ -87,7 +80,6 @@ const CheckUpdates = () => {
   );
 };
 
-// 🎨 Estilos PRO
 const styles = {
   container: {
     position: 'fixed' as const,
