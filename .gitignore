@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Clave publica y privada
+*.key
+*.key.pub
+
+
