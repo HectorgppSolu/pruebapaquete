@@ -2,10 +2,10 @@ import { useState } from "react";
 import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
-import   Updater  from "./components/Updater.tsx";
+import  { Updater}  from "./components/Updater.tsx";
 
 function App() {
-  <Updater />
+
 
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
@@ -19,6 +19,7 @@ function App() {
   return (
     
     <main className="container">
+        <Updater />
 
       <h1>Holaaaaaaaaacome to Tauri + React</h1>
 
