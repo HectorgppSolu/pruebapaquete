@@ -71,6 +71,8 @@ function CheckUpdates() {
       isDownloadingRef.current = false;
     }
   }, []);
+ 
+  
 
   const performUpdateNow = useCallback(async (updateToInstall: Update) => {
     try {
@@ -176,6 +178,7 @@ function CheckUpdates() {
 
     return () => clearTimeout(timeoutId);
   }, [checkUpdate]);
+
 
   useEffect(() => {
     if (!showNotification || !update || installing) return;
@@ -287,7 +290,7 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.85)',
+    background: 'rgba(255, 255, 255, 0.8)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -295,18 +298,18 @@ const styles = {
     backdropFilter: 'blur(8px)'
   },
   installingContainer: {
-    background: '#1a1a2e',
+    background: '#ffffff',
     padding: '48px',
     borderRadius: 20,
     textAlign: 'center' as const,
-    minWidth: 360,
-    maxWidth: 440,
+    minWidth: 700,
+    maxWidth: 540,
     boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
-    border: '1px solid rgba(255,255,255,0.08)'
+  
   },
   videoContainer: {
-    width: 120,
-    height: 120,
+      width: 600,
+  height: 250,
     margin: '0 auto 24px',
     borderRadius: 20,
     overflow: 'hidden',
@@ -325,14 +328,14 @@ const styles = {
     userSelect: 'none' as const,
   },
   installingTitle: {
-    color: '#fff',
+    color: '#307abe',
     fontSize: 22,
     fontWeight: '600' as const,
     marginBottom: 8,
     letterSpacing: '-0.3px'
   },
   installingText: {
-    color: '#94a3b8',
+    color: '#355077',
     fontSize: 14,
     marginBottom: 32,
     lineHeight: '1.5'
