@@ -21,7 +21,7 @@ function App() {
     <main className="container">
         <Updater />
 
-      <h1>Como esta welcome to Tauri + React</h1>
+      <h1>version 0.1.7</h1>
 
       <div className="row">
         <a href="https://vite.dev" target="_blank">
