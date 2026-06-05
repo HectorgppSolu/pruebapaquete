@@ -3,55 +3,69 @@ import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
 const PENDING_UPDATE_KEY = 'pending_update_version';
+const UPDATE_DOWNLOADED_KEY = 'update_downloaded';
 
 function CheckUpdates() {
   const [update, setUpdate] = useState<Update | null>(null);
   const [installing, setInstalling] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-  const [downloaded, setDownloaded] = useState(false);
-  const [showNotification, setShowNotification] = useState(true);
   const isCheckingRef = useRef(false);
   const isDownloadingRef = useRef(false);
-  const notificationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const downloadedUpdateRef = useRef<Update | null>(null);
 
-  const downloadUpdate = useCallback(async (updateToDownload: Update) => {
+  // Instala silenciosamente sin relaunch (para usar al reabrir)
+  const installSilently = useCallback(async (updateToInstall: Update) => {
+    try {
+      setInstalling(true);
+      await updateToInstall.downloadAndInstall();
+      localStorage.removeItem(PENDING_UPDATE_KEY);
+      localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
+      await relaunch();
+    } catch (error) {
+      console.error('Error al instalar silenciosamente:', error);
+      localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
+      setInstalling(false);
+    }
+  }, []);
+
+  // Descarga en background sin mostrar nada al usuario
+  const downloadInBackground = useCallback(async (updateToDownload: Update) => {
     if (isDownloadingRef.current) return;
-    
+
     try {
       isDownloadingRef.current = true;
-      setDownloading(true);
-      setShowNotification(true);
-      
-      console.log(`Descargando actualización ${updateToDownload.version} en segundo plano...`);
-      await updateToDownload.download();
-      
-      console.log(`Actualización ${updateToDownload.version} descargada exitosamente`);
-      setDownloaded(true);
-      setDownloading(false);
-      
-      // Iniciar timer para ocultar notificación después de 30 segundos
-      if (notificationTimerRef.current) {
-        clearTimeout(notificationTimerRef.current);
-      }
-      
-      notificationTimerRef.current = setTimeout(() => {
-        console.log(`Notificación de actualización ${updateToDownload.version} expirada`);
-        setShowNotification(false);
-      }, 30000);
-      
+      console.log(`Descargando actualización v${updateToDownload.version} en background...`);
+
+      // Descargar sin instalar — solo descarga los bytes
+      await updateToDownload.download((event) => {
+        switch (event.event) {
+          case 'Started':
+            console.log(`Descarga iniciada - Tamaño total: ${event.data.contentLength ?? 'desconocido'}`);
+            break;
+          case 'Progress':
+            console.log(`Progreso de descarga: +${event.data.chunkLength} bytes`);
+            break;
+          case 'Finished':
+            console.log(`Descarga completada: v${updateToDownload.version}`);
+            localStorage.setItem(UPDATE_DOWNLOADED_KEY, 'true');
+            localStorage.setItem(PENDING_UPDATE_KEY, updateToDownload.version);
+            downloadedUpdateRef.current = updateToDownload;
+            break;
+        }
+      });
     } catch (error) {
-      console.error('Error al descargar:', error);
-      setDownloading(false);
+      console.error('Error descargando en background:', error);
+      localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
     } finally {
       isDownloadingRef.current = false;
     }
   }, []);
 
-  const performInstall = useCallback(async (updateToInstall: Update) => {
+  const performUpdate = useCallback(async (updateToInstall: Update) => {
     try {
       setInstalling(true);
-      await updateToInstall.install();
+      await updateToInstall.downloadAndInstall();
       localStorage.removeItem(PENDING_UPDATE_KEY);
+      localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
       await relaunch();
     } catch (error) {
       console.error('Error al instalar:', error);
@@ -61,28 +75,28 @@ function CheckUpdates() {
 
   const checkUpdate = useCallback(async () => {
     if (isCheckingRef.current) return;
-    
+
     try {
       isCheckingRef.current = true;
       const result = await check();
 
       if (result) {
         const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
+        const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
 
-        // Si hay una versión pendiente que coincide, instalar directamente sin preguntar
-        if (pendingVersion === result.version) {
-          console.log(`Instalando actualización pendiente ${result.version} automáticamente`);
-          await performInstall(result);
+        // Si ya fue descargada en sesión anterior → instalar directo
+        if (pendingVersion === result.version && isDownloaded) {
+          console.log(`Instalando actualización pendiente v${result.version}...`);
+          await installSilently(result);
           return;
         }
 
-        // Si es una nueva versión, guardarla como pendiente
-        localStorage.setItem(PENDING_UPDATE_KEY, result.version);
-        
         setUpdate((current) => {
           if (!current || current.version !== result.version) {
-            // Iniciar descarga automática en segundo plano
-            void downloadUpdate(result);
+            // Iniciar descarga silenciosa en background
+            if (!isDownloaded || pendingVersion !== result.version) {
+              void downloadInBackground(result);
+            }
             return result;
           }
           return current;
@@ -93,22 +107,18 @@ function CheckUpdates() {
     } finally {
       isCheckingRef.current = false;
     }
-  }, [downloadUpdate, performInstall]);
+  }, [installSilently, downloadInBackground]);
 
-  // Verificar actualizaciones periódicamente y en focus
+  // Verificar periódicamente y en focus
   useEffect(() => {
     let mounted = true;
 
     const handleFocus = () => {
-      if (mounted) {
-        void checkUpdate();
-      }
+      if (mounted) void checkUpdate();
     };
 
     const interval = setInterval(() => {
-      if (mounted) {
-        void checkUpdate();
-      }
+      if (mounted) void checkUpdate();
     }, 60000);
 
     window.addEventListener('focus', handleFocus);
@@ -120,124 +130,85 @@ function CheckUpdates() {
     };
   }, [checkUpdate]);
 
-  // Verificar actualización inicial
+  // Verificación inicial
   useEffect(() => {
     const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
+    const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
     
     if (pendingVersion) {
-      console.log(`Actualización pendiente detectada: v${pendingVersion} - Se instalará automáticamente`);
+      console.log(`Actualización pendiente detectada: v${pendingVersion}${isDownloaded ? ' (descargada)' : ''}`);
     }
 
     const timeoutId = setTimeout(() => {
       void checkUpdate();
     }, 0);
 
-    return () => {
-      clearTimeout(timeoutId);
-      if (notificationTimerRef.current) {
-        clearTimeout(notificationTimerRef.current);
-      }
-    };
+    return () => clearTimeout(timeoutId);
   }, [checkUpdate]);
 
   if (installing) {
     return (
       <div style={styles.container}>
-        <div style={styles.content}>
-          <span style={styles.icon}>⚙️</span>
-          <div style={styles.textContainer}>
-            <span style={styles.title}>Instalando actualización...</span>
-            <span style={styles.version}>La aplicación se reiniciará automáticamente</span>
-          </div>
-        </div>
-        <div style={styles.progressContainer}>
-          <div style={{ ...styles.progressBar, width: '100%', backgroundColor: '#10b981' }} />
-        </div>
+        <span style={styles.installingText}>⚙️ Instalando actualización...</span>
       </div>
     );
   }
 
-  if (!update || !showNotification) {
-    return null;
-  }
+  if (!update) return null;
 
-  const handleInstallNow = () => {
-    if (notificationTimerRef.current) {
-      clearTimeout(notificationTimerRef.current);
-    }
-    void performInstall(update);
-  };
+  const handleInstall = () => void performUpdate(update);
 
   const handleClose = () => {
-    // El usuario cierra la notificación manualmente
-    // La actualización ya está marcada como pendiente y se instalará al reiniciar
-    if (notificationTimerRef.current) {
-      clearTimeout(notificationTimerRef.current);
-    }
-    console.log(`Usuario cerró la notificación. La actualización ${update.version} se instalará al reiniciar`);
-    setShowNotification(false);
+    // Guardar versión pendiente — la descarga ya corre en background
+    localStorage.setItem(PENDING_UPDATE_KEY, update.version);
+    setUpdate(null);
   };
 
-  const getStatusMessage = () => {
-    if (downloading) return 'Descargando en segundo plano...';
-    if (downloaded) return '✅ Descargada - Lista para instalar';
-    return 'Preparando descarga...';
+  const handleCancelPending = () => {
+    localStorage.removeItem(PENDING_UPDATE_KEY);
+    localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
+    isDownloadingRef.current = false;
+    setUpdate(null);
   };
 
-  const getStatusColor = () => {
-    if (downloaded) return '#10b981';
-    if (downloading) return '#f59e0b';
-    return '#94a3b8';
-  };
+  const isPendingFromPrevious = localStorage.getItem(PENDING_UPDATE_KEY) === update.version;
 
   return (
     <div style={styles.container}>
       <div style={styles.content}>
-        <span style={styles.icon}>
-          {downloaded ? '✅' : downloading ? '📥' : '🚀'}
-        </span>
+        <span style={styles.icon}>🚀</span>
         <div style={styles.textContainer}>
           <span style={styles.title}>
-            {downloaded ? 'Actualización lista' : downloading ? 'Descargando actualización' : 'Nueva versión disponible'}
+            {isPendingFromPrevious ? 'Actualización pendiente' : 'Nueva versión disponible'}
           </span>
           <span style={styles.version}>Versión {update.version}</span>
-          <span style={{ ...styles.status, color: getStatusColor() }}>
-            {getStatusMessage()}
-          </span>
         </div>
       </div>
 
-      {/* Barra de progreso */}
-      <div style={styles.progressContainer}>
-        <div 
-          style={{
-            ...styles.progressBar,
-            width: downloaded ? '100%' : downloading ? '60%' : '10%',
-            backgroundColor: getStatusColor(),
-          }} 
-        />
-      </div>
-
       <div style={styles.buttonGroup}>
-        <button
-          style={{
-            ...styles.primaryButton,
-            opacity: downloaded ? 1 : 0.7,
-            cursor: downloaded ? 'pointer' : 'not-allowed'
-          }}
-          onClick={handleInstallNow}
-          disabled={!downloaded}
-          title={downloaded ? 'Instalar y reiniciar ahora' : 'Espere a que termine la descarga'}
-        >
-          {downloaded ? 'Actualizar ahora' : 'Descargando...'}
-        </button>
-        <button
-          style={styles.secondaryButton}
-          onClick={handleClose}
-          title="La actualización se instalará automáticamente al reiniciar la aplicación"
-        >
-          Cerrar
-        </button>
+        {isPendingFromPrevious ? (
+          <>
+            <button style={styles.primaryButton} onClick={handleInstall}>
+              Actualizar ahora
+            </button>
+            <button style={styles.secondaryButton} onClick={handleCancelPending}>
+              Cancelar
+            </button>
+          </>
+        ) : (
+          <>
+            <button style={styles.primaryButton} onClick={handleInstall}>
+              Actualizar
+            </button>
+            <button
+              style={styles.secondaryButton}
+              onClick={handleClose}
+              title="Se instalará automáticamente al reiniciar la aplicación"
+            >
+              Después
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -250,64 +221,49 @@ const styles = {
     right: 20,
     background: '#111827',
     color: '#fff',
-    padding: '16px',
+    padding: '12px 16px',
     borderRadius: 12,
     fontSize: 13,
     display: 'flex',
-    flexDirection: 'column' as const,
+    alignItems: 'center',
+    justifyContent: 'space-between',
     gap: 12,
-    minWidth: 340,
+    minWidth: 300,
     boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
     border: '1px solid #ffffff15',
-    zIndex: 9999,
-    animation: 'slideUp 0.3s ease-out'
+    zIndex: 9999
   },
   content: {
     display: 'flex',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 12
   },
   icon: {
-    fontSize: 24,
-    marginTop: 2
+    fontSize: 24
   },
   textContainer: {
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: 4,
-    flex: 1
+    gap: 2
   },
   title: {
-    fontWeight: 600,
-    fontSize: 13,
-    lineHeight: '1.2'
+    fontWeight: '600' as const,
+    fontSize: 13
   },
   version: {
     fontSize: 11,
     color: '#94a3b8'
   },
-  status: {
-    fontSize: 10,
-    fontStyle: 'italic' as const,
-    marginTop: 2
-  },
-  progressContainer: {
+  installingText: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
     width: '100%',
-    height: 3,
-    backgroundColor: '#1f2937',
-    borderRadius: 2,
-    overflow: 'hidden'
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 2,
-    transition: 'width 0.5s ease-in-out, background-color 0.3s ease'
+    justifyContent: 'center' as const
   },
   buttonGroup: {
     display: 'flex',
-    gap: 8,
-    justifyContent: 'flex-end',
-    marginTop: 4
+    gap: 8
   },
   primaryButton: {
     background: '#2563eb',
@@ -317,8 +273,7 @@ const styles = {
     borderRadius: 8,
     cursor: 'pointer',
     fontSize: 12,
-    fontWeight: 500,
-    transition: 'all 0.2s'
+    fontWeight: '500' as const
   },
   secondaryButton: {
     background: 'transparent',
@@ -327,8 +282,7 @@ const styles = {
     padding: '8px 16px',
     borderRadius: 8,
     cursor: 'pointer',
-    fontSize: 12,
-    transition: 'all 0.2s'
+    fontSize: 12
   }
 };
 
