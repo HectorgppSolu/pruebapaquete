@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -7,6 +7,7 @@ const PENDING_UPDATE_KEY = 'pending_update_version';
 function CheckUpdates() {
   const [update, setUpdate] = useState<Update | null>(null);
   const [installing, setInstalling] = useState(false);
+  const isCheckingRef = useRef(false);
 
   const performUpdate = useCallback(async (updateToInstall: Update) => {
     try {
@@ -22,7 +23,11 @@ function CheckUpdates() {
   }, []);
 
   const checkUpdate = useCallback(async () => {
+    // Evitar verificaciones múltiples simultáneas
+    if (isCheckingRef.current) return;
+    
     try {
+      isCheckingRef.current = true;
       const result = await check();
 
       if (result) {
@@ -45,36 +50,51 @@ function CheckUpdates() {
       }
     } catch (error) {
       console.error('Updater error:', error);
+    } finally {
+      isCheckingRef.current = false;
     }
   }, [performUpdate]);
 
+  // Verificar actualizaciones periódicamente y en focus
   useEffect(() => {
-    // Verificar al cargar la app
-    void checkUpdate();
+    let mounted = true;
 
     const handleFocus = () => {
-      void checkUpdate();
+      if (mounted) {
+        void checkUpdate();
+      }
     };
 
     const interval = setInterval(() => {
-      void checkUpdate();
+      if (mounted) {
+        void checkUpdate();
+      }
     }, 60000);
 
     window.addEventListener('focus', handleFocus);
 
     return () => {
+      mounted = false;
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
   }, [checkUpdate]);
 
-  // Verificar actualización pendiente al montar el componente
+  // Verificar actualización inicial - SEPARADO del efecto periódico
   useEffect(() => {
     const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
+    
     if (pendingVersion) {
       console.log(`Actualización pendiente detectada: v${pendingVersion}`);
     }
-  }, []);
+
+    // Usar setTimeout para evitar llamar setState sincrónicamente en el efecto
+    const timeoutId = setTimeout(() => {
+      void checkUpdate();
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
+  }, [checkUpdate]);
 
   if (installing) {
     return (
@@ -233,19 +253,21 @@ const styles = {
 };
 
 // Agregar animación CSS
-const styleSheet = document.createElement("style");
-styleSheet.textContent = `
-  @keyframes slideUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement("style");
+  styleSheet.textContent = `
+    @keyframes slideUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-`;
-document.head.appendChild(styleSheet);
+  `;
+  document.head.appendChild(styleSheet);
+}
 
 export default CheckUpdates;
