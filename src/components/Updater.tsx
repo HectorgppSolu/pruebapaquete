@@ -2,6 +2,9 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
+// Cambia esta ruta por la ubicacion de tu video
+import updateVideo from '../assets/video.webm';
+
 const PENDING_UPDATE_KEY = 'pending_update_version';
 const UPDATE_DOWNLOADED_KEY = 'update_downloaded';
 
@@ -16,15 +19,14 @@ function CheckUpdates() {
   const isInitialCheckDoneRef = useRef(false);
   const updateRef = useRef<Update | null>(null);
 
-  // Instalar silenciosamente al abrir la app
   const installSilentlyOnStartup = useCallback(async (updateToInstall: Update) => {
     try {
-      console.log('Instalando actualización pendiente al iniciar...');
+      console.log('Instalando actualizacion pendiente al iniciar...');
       setInstalling(true);
       await updateToInstall.downloadAndInstall();
       localStorage.removeItem(PENDING_UPDATE_KEY);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
-      console.log('Instalación completada, reiniciando...');
+      console.log('Instalacion completada, reiniciando...');
       await relaunch();
     } catch (error) {
       console.error('Error al instalar:', error);
@@ -34,7 +36,6 @@ function CheckUpdates() {
     }
   }, []);
 
-  // Descargar en background (sin instalar)
   const downloadInBackground = useCallback(async (updateToDownload: Update) => {
     if (isDownloadingRef.current) {
       console.log('Descarga ya en progreso...');
@@ -52,7 +53,6 @@ function CheckUpdates() {
             console.log(`Iniciando descarga (${event.data.contentLength} bytes)`);
             break;
           case 'Progress':
-            // Silencioso
             break;
           case 'Finished':
             console.log(`Descarga completada: v${updateToDownload.version}`);
@@ -64,7 +64,7 @@ function CheckUpdates() {
         }
       });
     } catch (error) {
-      console.error('❌ Error descargando:', error);
+      console.error('Error descargando:', error);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
       setDownloading(false);
     } finally {
@@ -72,19 +72,18 @@ function CheckUpdates() {
     }
   }, []);
 
-  // Instalar cuando el usuario hace clic en "Actualizar ahora"
   const performUpdateNow = useCallback(async (updateToInstall: Update) => {
     try {
-      console.log(' Usuario solicitó instalar ahora...');
+      console.log('Usuario solicito instalar ahora...');
       setShowNotification(false);
       setInstalling(true);
       await updateToInstall.downloadAndInstall();
       localStorage.removeItem(PENDING_UPDATE_KEY);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
-      console.log(' Instalación completada, reiniciando...');
+      console.log('Instalacion completada, reiniciando...');
       await relaunch();
     } catch (error) {
-      console.error(' Error al instalar:', error);
+      console.error('Error al instalar:', error);
       setInstalling(false);
       setShowNotification(true);
     }
@@ -95,71 +94,64 @@ function CheckUpdates() {
 
     try {
       isCheckingRef.current = true;
-      console.log(' Verificando actualizaciones...');
+      console.log('Verificando actualizaciones...');
       const result = await check();
 
       if (result) {
-        console.log(`Actualización encontrada: v${result.version}`);
+        console.log(`Actualizacion encontrada: v${result.version}`);
         const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
         const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
 
-        // CASO 1: Al ABRIR la app - Si hay pendiente descargada → instalar silenciosamente
         if (!isInitialCheckDoneRef.current && pendingVersion && isDownloaded) {
-          console.log('Instalación silenciosa al iniciar...');
+          console.log('Instalacion silenciosa al iniciar...');
           await installSilentlyOnStartup(result);
           return;
         }
 
-        // CASO 2: App YA ABIERTA - Guardar y mostrar notificación
         if (isInitialCheckDoneRef.current) {
-          console.log('📱 App ya abierta - Mostrando notificación');
+          console.log('App ya abierta - Mostrando notificacion');
           
-          // Guardar como pendiente
           localStorage.setItem(PENDING_UPDATE_KEY, result.version);
           updateRef.current = result;
           
-          // Mostrar notificación
           setUpdate(result);
           setShowNotification(true);
           
-          // Iniciar descarga en background
           if (!isDownloaded || pendingVersion !== result.version) {
             void downloadInBackground(result);
           }
         }
       } else {
         console.log('No hay actualizaciones disponibles');
-        // Limpiar banderas si no hay actualización
         if (localStorage.getItem(PENDING_UPDATE_KEY)) {
           localStorage.removeItem(PENDING_UPDATE_KEY);
           localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
         }
       }
     } catch (error) {
-      console.error('❌ Error verificando:', error);
+      console.error('Error verificando:', error);
     } finally {
       isCheckingRef.current = false;
       isInitialCheckDoneRef.current = true;
     }
   }, [installSilentlyOnStartup, downloadInBackground]);
 
-  // Verificar periódicamente (solo después del inicio)
   useEffect(() => {
     let mounted = true;
 
     const handleFocus = () => {
       if (mounted && isInitialCheckDoneRef.current) {
-        console.log('🪟 Ventana enfocada');
+        console.log('Ventana enfocada');
         void checkUpdate();
       }
     };
 
     const interval = setInterval(() => {
       if (mounted && isInitialCheckDoneRef.current) {
-        console.log('⏰ Verificación periódica');
+        console.log('Verificacion periodica');
         void checkUpdate();
       }
-    }, 60000); // Cada minuto
+    }, 60000);
 
     window.addEventListener('focus', handleFocus);
 
@@ -170,16 +162,14 @@ function CheckUpdates() {
     };
   }, [checkUpdate]);
 
-  // Verificación inicial al montar
   useEffect(() => {
     const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
     const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
     
     console.log('App iniciada');
-    console.log(`   - Versión pendiente: ${pendingVersion || 'ninguna'}`);
-    console.log(`   - Descargada: ${isDownloaded ? 'sí' : 'no'}`);
+    console.log(`   - Version pendiente: ${pendingVersion || 'ninguna'}`);
+    console.log(`   - Descargada: ${isDownloaded ? 'si' : 'no'}`);
 
-    // Pequeño delay para asegurar que todo esté listo
     const timeoutId = setTimeout(() => {
       void checkUpdate();
     }, 1000);
@@ -187,32 +177,40 @@ function CheckUpdates() {
     return () => clearTimeout(timeoutId);
   }, [checkUpdate]);
 
-  // Auto-ocultar notificación después de 30 segundos si el usuario no interactúa
   useEffect(() => {
     if (!showNotification || !update || installing) return;
 
-    console.log('Iniciando timer de auto-ocultación (30s)');
+    console.log('Iniciando timer de auto-ocultacion (30s)');
     const timer = setTimeout(() => {
-      console.log('Notificación auto-ocultada - La descarga continúa');
+      console.log('Notificacion auto-ocultada - La descarga continua');
       setShowNotification(false);
     }, 30000);
 
     return () => {
-      console.log('⏱️ Limpiando timer');
+      console.log('Limpiando timer');
       clearTimeout(timer);
     };
   }, [showNotification, update, installing]);
 
-  // ==================== RENDER ====================
-
-  // Pantalla de instalación (se muestra tanto en inicio como cuando el usuario instala)
   if (installing) {
     return (
       <div style={styles.installingOverlay}>
         <div style={styles.installingContainer}>
-          <div style={styles.installingSpinner}>⚙️</div>
-          <h2 style={styles.installingTitle}>Instalando actualización</h2>
-          <p style={styles.installingText}>La aplicación se reiniciará automáticamente</p>
+          <div style={styles.videoContainer}>
+            <video
+              src={updateVideo}
+              autoPlay
+              loop
+              muted
+              playsInline
+              disablePictureInPicture
+              controlsList="nodownload nofullscreen noremoteplayback"
+              style={styles.video}
+              onContextMenu={(e) => e.preventDefault()}
+            />
+          </div>
+          <h2 style={styles.installingTitle}>Instalando actualizacion</h2>
+          <p style={styles.installingText}>La aplicacion se reiniciara automaticamente</p>
           <div style={styles.progressBar}>
             <div style={styles.progressFill} />
           </div>
@@ -221,33 +219,26 @@ function CheckUpdates() {
     );
   }
 
-  // No mostrar notificación si no hay update o si no se debe mostrar
   if (!update || !showNotification) return null;
 
   const handleInstallNow = () => {
-    console.log(' Usuario hizo clic en "Actualizar ahora"');
+    console.log('Usuario hizo clic en "Actualizar ahora"');
     void performUpdateNow(update);
   };
 
   const handleLater = () => {
-    console.log('Usuario hizo clic en "Después" - La descarga continúa');
+    console.log('Usuario hizo clic en "Despues" - La descarga continua');
     setShowNotification(false);
   };
 
-  const getStatusIcon = () => {
-    if (downloaded) return '';
-    if (downloading) return '';
-    return '';
-  };
-
   const getTitle = () => {
-    if (downloaded) return '¡Actualización lista!';
-    if (downloading) return 'Descargando actualización...';
-    return 'Nueva versión disponible';
+    if (downloaded) return 'Actualizacion lista';
+    if (downloading) return 'Descargando actualizacion...';
+    return 'Nueva version disponible';
   };
 
   const getStatusText = () => {
-    if (downloaded) return 'Se instalará al reiniciar la aplicación';
+    if (downloaded) return 'Se instalara al reiniciar la aplicacion';
     if (downloading) return 'Descargando en segundo plano...';
     return 'Iniciando descarga...';
   };
@@ -255,10 +246,9 @@ function CheckUpdates() {
   return (
     <div style={styles.notificationContainer}>
       <div style={styles.notificationHeader}>
-        <span style={styles.notificationIcon}>{getStatusIcon()}</span>
         <div style={styles.notificationText}>
           <span style={styles.notificationTitle}>{getTitle()}</span>
-          <span style={styles.notificationVersion}>Versión {update.version}</span>
+          <span style={styles.notificationVersion}>Version {update.version}</span>
         </div>
       </div>
 
@@ -283,55 +273,69 @@ function CheckUpdates() {
           style={styles.secondaryButton}
           onClick={handleLater}
         >
-          Después
+          Despues
         </button>
       </div>
     </div>
   );
 }
 
-// ==================== ESTILOS ====================
-
 const styles = {
-  // Overlay de instalación
   installingOverlay: {
     position: 'fixed' as const,
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    background: 'rgba(0, 0, 0, 0.8)',
+    background: 'rgba(0, 0, 0, 0.85)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 9999,
-    backdropFilter: 'blur(4px)'
+    backdropFilter: 'blur(8px)'
   },
   installingContainer: {
     background: '#1a1a2e',
-    padding: '40px',
-    borderRadius: 16,
+    padding: '48px',
+    borderRadius: 20,
     textAlign: 'center' as const,
-    minWidth: 320,
-    boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
-    border: '1px solid rgba(255,255,255,0.1)'
+    minWidth: 360,
+    maxWidth: 440,
+    boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
+    border: '1px solid rgba(255,255,255,0.08)'
   },
-  installingSpinner: {
-    fontSize: 48,
-    display: 'block',
-    marginBottom: 16,
-    animation: 'spin 2s linear infinite'
+  videoContainer: {
+    width: 120,
+    height: 120,
+    margin: '0 auto 24px',
+    borderRadius: 20,
+    overflow: 'hidden',
+    backgroundColor: '#0f0f23',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+    border: '2px solid rgba(255,255,255,0.1)'
+  },
+  video: {
+    width: '100%',
+    height: '100%',
+    objectFit: 'cover' as const,
+    pointerEvents: 'none' as const,
+    userSelect: 'none' as const,
   },
   installingTitle: {
     color: '#fff',
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '600' as const,
-    marginBottom: 8
+    marginBottom: 8,
+    letterSpacing: '-0.3px'
   },
   installingText: {
     color: '#94a3b8',
     fontSize: 14,
-    marginBottom: 24
+    marginBottom: 32,
+    lineHeight: '1.5'
   },
   progressBar: {
     width: '100%',
@@ -346,8 +350,6 @@ const styles = {
     backgroundColor: '#10b981',
     animation: 'progress 2s ease-in-out infinite'
   },
-
-  // Notificación
   notificationContainer: {
     position: 'fixed' as const,
     bottom: 24,
@@ -372,10 +374,6 @@ const styles = {
     display: 'flex',
     alignItems: 'flex-start',
     gap: 12
-  },
-  notificationIcon: {
-    fontSize: 28,
-    lineHeight: 1
   },
   notificationText: {
     display: 'flex',
@@ -442,7 +440,6 @@ const styles = {
   }
 };
 
-// Agregar animaciones CSS
 if (typeof document !== 'undefined') {
   const styleSheet = document.createElement("style");
   styleSheet.textContent = `
@@ -455,11 +452,6 @@ if (typeof document !== 'undefined') {
         opacity: 1;
         transform: translateY(0);
       }
-    }
-    
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
     }
     
     @keyframes pulse {
