@@ -19,15 +19,15 @@ function CheckUpdates() {
   // Instalar silenciosamente al abrir la app
   const installSilentlyOnStartup = useCallback(async (updateToInstall: Update) => {
     try {
-      console.log('🔄 Instalando actualización pendiente al iniciar...');
+      console.log('Instalando actualización pendiente al iniciar...');
       setInstalling(true);
       await updateToInstall.downloadAndInstall();
       localStorage.removeItem(PENDING_UPDATE_KEY);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
-      console.log('✅ Instalación completada, reiniciando...');
+      console.log('Instalación completada, reiniciando...');
       await relaunch();
     } catch (error) {
-      console.error('❌ Error al instalar:', error);
+      console.error('Error al instalar:', error);
       localStorage.removeItem(PENDING_UPDATE_KEY);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
       setInstalling(false);
@@ -37,25 +37,25 @@ function CheckUpdates() {
   // Descargar en background (sin instalar)
   const downloadInBackground = useCallback(async (updateToDownload: Update) => {
     if (isDownloadingRef.current) {
-      console.log('⏳ Descarga ya en progreso...');
+      console.log('Descarga ya en progreso...');
       return;
     }
 
     try {
       isDownloadingRef.current = true;
       setDownloading(true);
-      console.log(`📥 Descargando v${updateToDownload.version} en background...`);
+      console.log(`Descargando v${updateToDownload.version} en background...`);
 
       await updateToDownload.download((event) => {
         switch (event.event) {
           case 'Started':
-            console.log(`📦 Iniciando descarga (${event.data.contentLength} bytes)`);
+            console.log(`Iniciando descarga (${event.data.contentLength} bytes)`);
             break;
           case 'Progress':
             // Silencioso
             break;
           case 'Finished':
-            console.log(`✅ Descarga completada: v${updateToDownload.version}`);
+            console.log(`Descarga completada: v${updateToDownload.version}`);
             localStorage.setItem(UPDATE_DOWNLOADED_KEY, 'true');
             localStorage.setItem(PENDING_UPDATE_KEY, updateToDownload.version);
             setDownloaded(true);
@@ -75,16 +75,16 @@ function CheckUpdates() {
   // Instalar cuando el usuario hace clic en "Actualizar ahora"
   const performUpdateNow = useCallback(async (updateToInstall: Update) => {
     try {
-      console.log('🔄 Usuario solicitó instalar ahora...');
+      console.log(' Usuario solicitó instalar ahora...');
       setShowNotification(false);
       setInstalling(true);
       await updateToInstall.downloadAndInstall();
       localStorage.removeItem(PENDING_UPDATE_KEY);
       localStorage.removeItem(UPDATE_DOWNLOADED_KEY);
-      console.log('✅ Instalación completada, reiniciando...');
+      console.log(' Instalación completada, reiniciando...');
       await relaunch();
     } catch (error) {
-      console.error('❌ Error al instalar:', error);
+      console.error(' Error al instalar:', error);
       setInstalling(false);
       setShowNotification(true);
     }
@@ -95,17 +95,17 @@ function CheckUpdates() {
 
     try {
       isCheckingRef.current = true;
-      console.log('🔍 Verificando actualizaciones...');
+      console.log(' Verificando actualizaciones...');
       const result = await check();
 
       if (result) {
-        console.log(`📢 Actualización encontrada: v${result.version}`);
+        console.log(`Actualización encontrada: v${result.version}`);
         const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
         const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
 
         // CASO 1: Al ABRIR la app - Si hay pendiente descargada → instalar silenciosamente
         if (!isInitialCheckDoneRef.current && pendingVersion && isDownloaded) {
-          console.log('🚀 Instalación silenciosa al iniciar...');
+          console.log('Instalación silenciosa al iniciar...');
           await installSilentlyOnStartup(result);
           return;
         }
@@ -128,7 +128,7 @@ function CheckUpdates() {
           }
         }
       } else {
-        console.log('✅ No hay actualizaciones disponibles');
+        console.log('No hay actualizaciones disponibles');
         // Limpiar banderas si no hay actualización
         if (localStorage.getItem(PENDING_UPDATE_KEY)) {
           localStorage.removeItem(PENDING_UPDATE_KEY);
@@ -175,7 +175,7 @@ function CheckUpdates() {
     const pendingVersion = localStorage.getItem(PENDING_UPDATE_KEY);
     const isDownloaded = localStorage.getItem(UPDATE_DOWNLOADED_KEY) === 'true';
     
-    console.log('🎬 App iniciada');
+    console.log('App iniciada');
     console.log(`   - Versión pendiente: ${pendingVersion || 'ninguna'}`);
     console.log(`   - Descargada: ${isDownloaded ? 'sí' : 'no'}`);
 
@@ -191,9 +191,9 @@ function CheckUpdates() {
   useEffect(() => {
     if (!showNotification || !update || installing) return;
 
-    console.log('⏱️ Iniciando timer de auto-ocultación (30s)');
+    console.log('Iniciando timer de auto-ocultación (30s)');
     const timer = setTimeout(() => {
-      console.log('🔕 Notificación auto-ocultada - La descarga continúa');
+      console.log('Notificación auto-ocultada - La descarga continúa');
       setShowNotification(false);
     }, 30000);
 
@@ -225,19 +225,19 @@ function CheckUpdates() {
   if (!update || !showNotification) return null;
 
   const handleInstallNow = () => {
-    console.log('👆 Usuario hizo clic en "Actualizar ahora"');
+    console.log(' Usuario hizo clic en "Actualizar ahora"');
     void performUpdateNow(update);
   };
 
   const handleLater = () => {
-    console.log('👆 Usuario hizo clic en "Después" - La descarga continúa');
+    console.log('Usuario hizo clic en "Después" - La descarga continúa');
     setShowNotification(false);
   };
 
   const getStatusIcon = () => {
-    if (downloaded) return '✅';
-    if (downloading) return '📥';
-    return '🚀';
+    if (downloaded) return '';
+    if (downloading) return '';
+    return '';
   };
 
   const getTitle = () => {
