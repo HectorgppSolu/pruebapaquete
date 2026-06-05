@@ -21,7 +21,7 @@ function App() {
     <main className="container">
         <Updater />
 
-      <h1>version 0.1.14</h1>
+      <h1>version 0.1.16</h1>
 
       <div className="row">
         <a href="https://vite.dev" target="_blank">
