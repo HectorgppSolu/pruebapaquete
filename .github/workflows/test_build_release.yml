@@ -100,8 +100,8 @@ jobs:
        env:
          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
        with:
-         tagName: V0.1.21
-         releaseName: "Release V0.1.21"
+         tagName: V0.1.22
+         releaseName: "Release V0.1.22"
          releaseBody: "See the changelog for more details."
          releaseDraft: false
          prerelease: false
