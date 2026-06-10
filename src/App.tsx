@@ -3,13 +3,13 @@ import reactLogo from "./assets/react.svg";
 import { invoke } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import "./App.css";
-import Updater from "./components/Updater";
+import Updater, { CheckUpdatesHandle } from "./components/Updater";
 
 function App() {
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
   const [appVersion, setAppVersion] = useState("v0.0.0");
-  const updaterRef = useRef<any>(null);
+  const updaterRef = useRef<CheckUpdatesHandle>(null);
 
   useEffect(() => {
     const fetchVersion = async () => {
