@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
 import { check, Update } from '@tauri-apps/plugin-updater';
 import { relaunch } from '@tauri-apps/plugin-process';
 
@@ -8,7 +8,11 @@ import updateVideo from '../assets/video.webm';
 const PENDING_UPDATE_KEY = 'pending_update_version';
 const UPDATE_DOWNLOADED_KEY = 'update_downloaded';
 
-function CheckUpdates() {
+export interface CheckUpdatesHandle {
+  checkForUpdates: () => void;
+}
+
+const CheckUpdates = forwardRef<CheckUpdatesHandle>((_, ref) => {
   const [update, setUpdate] = useState<Update | null>(null);
   const [installing, setInstalling] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -138,6 +142,13 @@ function CheckUpdates() {
     }
   }, [installSilentlyOnStartup, downloadInBackground]);
 
+  useImperativeHandle(ref, () => ({
+    checkForUpdates: () => {
+      console.log('Verificación manual de actualizaciones solicitada');
+      void checkUpdate();
+    }
+  }), [checkUpdate]);
+
   useEffect(() => {
     let mounted = true;
 
@@ -148,18 +159,10 @@ function CheckUpdates() {
       }
     };
 
-    const interval = setInterval(() => {
-      if (mounted && isInitialCheckDoneRef.current) {
-        console.log('Verificacion periodica');
-        void checkUpdate();
-      }
-    }, 60000);
-
     window.addEventListener('focus', handleFocus);
 
     return () => {
       mounted = false;
-      clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
   }, [checkUpdate]);
@@ -281,7 +284,7 @@ function CheckUpdates() {
       </div>
     </div>
   );
-}
+});
 
 const styles = {
   installingOverlay: {
@@ -469,5 +472,7 @@ if (typeof document !== 'undefined') {
   `;
   document.head.appendChild(styleSheet);
 }
+
+CheckUpdates.displayName = 'CheckUpdates';
 
 export default CheckUpdates;
